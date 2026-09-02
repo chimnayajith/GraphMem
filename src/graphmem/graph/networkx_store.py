@@ -64,3 +64,20 @@ class NetworkXGraphStore(GraphStore):
             self.graph.nodes[neighbor_id]["entity"]
             for neighbor_id in neighbor_ids
         ]
+    
+    def get_entities_by_type(
+        self,
+        entity_type: EntityType,
+    ) -> list[CodeEntity]:
+
+        return [
+            data["entity"]
+            for _, data in self.graph.nodes(data=True)
+            if data["entity"].type == entity_type
+        ]
+    
+    def entity_count(self) -> int:
+        return self.graph.number_of_nodes()
+
+    def relation_count(self) -> int:
+        return self.graph.number_of_edges()

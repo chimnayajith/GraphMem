@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 from graphmem.models.entities import CodeEntity
 from graphmem.models.relations import Relation
-
+from graphmem.models.entities import CodeEntity, EntityType
 
 class GraphStore(ABC):
     """
@@ -30,4 +30,24 @@ class GraphStore(ABC):
     @abstractmethod
     def neighbors(self, entity_id: str) -> list[CodeEntity]:
         """Return entities directly connected to the given entity."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_entities_by_type(
+        self,
+        entity_type: EntityType,
+    ) -> list[CodeEntity]:
+        """Return all entities of a given type."""
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def entity_count(self) -> int:
+        """Return the number of entities in the graph."""
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def relation_count(self) -> int:
+        """Return the number of relationships in the graph."""
         raise NotImplementedError
