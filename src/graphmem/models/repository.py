@@ -16,3 +16,13 @@ class ParsedRepository:
 
     def add_relation(self, relation: Relation) -> None:
         self.relations.append(relation)
+    
+    def get_entity(
+        self,
+        entity_id: str,
+    ) -> CodeEntity | None:
+        for entity in self.entities:
+            if entity.id == entity_id:
+                return entity
+
+        return None
