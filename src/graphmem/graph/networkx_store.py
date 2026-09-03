@@ -1,7 +1,7 @@
 import networkx as nx
 
 from graphmem.graph.store import GraphStore
-from graphmem.models.entities import CodeEntity
+from graphmem.models.entities import CodeEntity, EntityType
 from graphmem.models.relations import Relation
 
 
