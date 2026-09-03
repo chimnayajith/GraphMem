@@ -22,6 +22,18 @@ Scope of this milestone (see task priority order):
 Call/inheritance resolution, statement-level nodes, and data-flow are
 deliberately out of scope here (owned by later work / other members).
 
+Uses the shared models from graphmem.models (graphmem.models.entities,
+graphmem.models.relations, graphmem.models.repository) exclusively -
+no separate entity/relation format is defined here. In particular:
+
+* `CodeEntity` has no `language` or `version` field, so both are
+  recorded in `entity.metadata` instead (`metadata["language"]`,
+  `metadata["version"]`).
+* `CodeEntity.path` (not `file_path`) holds the repo-relative source
+  path.
+* `Relation` has no `confidence`/`source` field, so provenance for
+  resolved imports is recorded in `relation.metadata` instead.
+
 Design notes
 ------------
 * Directories are included as first-class DIRECTORY nodes (ADR-03),
@@ -41,11 +53,13 @@ Design notes
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 from typing import Optional
 
-from graphmem.models import CodeEntity, EntityType, ParsedRepository, Relation, RelationType
+from graphmem.models.entities import CodeEntity, EntityType
+from graphmem.models.relations import Relation, RelationType
+from graphmem.models.repository import ParsedRepository
 from graphmem.parsing.base import LanguageParser
 
 #: Directories we never descend into when walking a repository.
@@ -85,18 +99,16 @@ class PythonParser(LanguageParser):
         repo_name = self.resolve_repo_name(str(repo_root))
         version = self.resolve_version(str(repo_root))
 
-        parsed = ParsedRepository(repository_path=str(repo_root), version=version, language=self.language)
+        parsed = ParsedRepository(repository_path=str(repo_root))
 
         # --- Pass 0: repository root entity ---------------------------------
         repo_entity_id = f"repo://{repo_name}@{version}"
-        parsed.entities.append(
+        parsed.add_entity(
             CodeEntity(
                 id=repo_entity_id,
                 type=EntityType.REPOSITORY,
                 name=repo_name,
-                file_path="",
-                language=self.language,
-                version=version,
+                metadata={"language": self.language, "version": version},
             )
         )
 
@@ -107,7 +119,6 @@ class PythonParser(LanguageParser):
 
         self._build_directory_hierarchy(
             parsed=parsed,
-            repo_root=repo_root,
             repo_name=repo_name,
             repo_entity_id=repo_entity_id,
             version=version,
@@ -115,16 +126,14 @@ class PythonParser(LanguageParser):
         )
 
         for rec in file_records:
-            parsed.entities.append(
+            parsed.add_entity(
                 CodeEntity(
                     id=rec.entity_id,
                     type=EntityType.FILE,
-                    name=Path(rec.relative_path).name,
+                    name=PurePosixPath(rec.relative_path).name,
+                    path=rec.relative_path,
                     qualified_name=rec.module_name,
-                    file_path=rec.relative_path,
-                    language=self.language,
-                    version=version,
-                    metadata={"imports": []},
+                    metadata={"language": self.language, "version": version, "imports": []},
                 )
             )
 
@@ -178,7 +187,6 @@ class PythonParser(LanguageParser):
         self,
         *,
         parsed: ParsedRepository,
-        repo_root: Path,
         repo_name: str,
         repo_entity_id: str,
         version: str,
@@ -186,31 +194,38 @@ class PythonParser(LanguageParser):
     ) -> None:
         """Create DIRECTORY entities for every directory that (transitively)
         contains a parsed file, plus CONTAINS edges down to files.
+
+        NOTE: every path here is manipulated as a posix-style string
+        (forward slashes), matching `_FileRecord.relative_path` and the
+        `path` field stored on entities. `pathlib.Path(...)` must NOT be
+        used for this bookkeeping on its own: on Windows it silently
+        renders back out with backslashes, which desyncs sorting/dict
+        lookups keyed on forward slashes. `PurePosixPath` stays on "/"
+        regardless of host OS.
         """
         directory_paths: set[str] = set()
         for rec in file_records:
-            parent = str(Path(rec.relative_path).parent)
+            parent = PurePosixPath(rec.relative_path).parent.as_posix()
             while parent not in (".", ""):
                 directory_paths.add(parent)
-                parent = str(Path(parent).parent)
+                parent = PurePosixPath(parent).parent.as_posix()
 
         dir_entity_id = {"": repo_entity_id}
         for dir_path in sorted(directory_paths, key=lambda p: p.count("/")):
             entity_id = self.make_entity_id(repo_name, dir_path, version)
             dir_entity_id[dir_path] = entity_id
-            parsed.entities.append(
+            parsed.add_entity(
                 CodeEntity(
                     id=entity_id,
                     type=EntityType.DIRECTORY,
-                    name=Path(dir_path).name,
-                    file_path=dir_path,
-                    language=self.language,
-                    version=version,
+                    name=PurePosixPath(dir_path).name,
+                    path=dir_path,
+                    metadata={"language": self.language, "version": version},
                 )
             )
-            parent_dir = str(Path(dir_path).parent)
+            parent_dir = PurePosixPath(dir_path).parent.as_posix()
             parent_dir = "" if parent_dir == "." else parent_dir
-            parsed.relations.append(
+            parsed.add_relation(
                 Relation(
                     source_id=dir_entity_id[parent_dir],
                     target_id=entity_id,
@@ -219,9 +234,9 @@ class PythonParser(LanguageParser):
             )
 
         for rec in file_records:
-            parent_dir = str(Path(rec.relative_path).parent)
+            parent_dir = PurePosixPath(rec.relative_path).parent.as_posix()
             parent_dir = "" if parent_dir == "." else parent_dir
-            parsed.relations.append(
+            parsed.add_relation(
                 Relation(
                     source_id=dir_entity_id.get(parent_dir, repo_entity_id),
                     target_id=rec.entity_id,
@@ -260,12 +275,15 @@ class PythonParser(LanguageParser):
         visitor = _DefinitionVisitor(
             repo_name=repo_name,
             version=version,
+            language=self.language,
             rec=rec,
             make_entity_id=self.make_entity_id,
         )
         visitor.visit(tree)
-        parsed.entities.extend(visitor.entities)
-        parsed.relations.extend(visitor.relations)
+        for entity in visitor.entities:
+            parsed.add_entity(entity)
+        for relation in visitor.relations:
+            parsed.add_relation(relation)
 
         # Imports (module-level and nested, but always resolved at file
         # granularity - see module docstring).
@@ -321,13 +339,12 @@ class PythonParser(LanguageParser):
                         resolved_targets.add(target.entity_id)
 
         for target_id in resolved_targets:
-            parsed.relations.append(
+            parsed.add_relation(
                 Relation(
                     source_id=rec.entity_id,
                     target_id=target_id,
                     type=RelationType.IMPORTS,
-                    confidence=1.0,
-                    source="import_resolution",
+                    metadata={"resolved_via": "module_path_match"},
                 )
             )
 
@@ -366,9 +383,10 @@ class _DefinitionVisitor(ast.NodeVisitor):
     imports are resolved at file granularity regardless of nesting.
     """
 
-    def __init__(self, *, repo_name: str, version: str, rec: _FileRecord, make_entity_id):
+    def __init__(self, *, repo_name: str, version: str, language: str, rec: _FileRecord, make_entity_id):
         self.repo_name = repo_name
         self.version = version
+        self.language = language
         self.rec = rec
         self.make_entity_id = make_entity_id
 
@@ -406,7 +424,11 @@ class _DefinitionVisitor(ast.NodeVisitor):
         )
 
         decorators = [self._decorator_name(d) for d in getattr(node, "decorator_list", [])]
-        metadata: dict = {"decorators": decorators}
+        metadata: dict = {
+            "language": self.language,
+            "version": self.version,
+            "decorators": decorators,
+        }
         if is_class:
             metadata["bases"] = [self._decorator_name(b) for b in node.bases]
 
@@ -414,13 +436,11 @@ class _DefinitionVisitor(ast.NodeVisitor):
             id=entity_id,
             type=entity_type,
             name=node.name,
+            path=self.rec.relative_path,
             qualified_name=qualified_name,
-            file_path=self.rec.relative_path,
             start_line=node.lineno,
             end_line=getattr(node, "end_lineno", node.lineno),
             parent_id=parent_id,
-            language="python",
-            version=self.version,
             metadata=metadata,
         )
         self.entities.append(entity)

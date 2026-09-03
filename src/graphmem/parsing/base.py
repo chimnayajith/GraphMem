@@ -6,13 +6,17 @@ language-specific AST details. Each parser only needs to:
 
     1. walk a repository directory,
     2. emit CodeEntity / Relation objects using the shared schema in
-       graphmem.models,
+       graphmem.models (graphmem.models.entities / .relations / .repository),
     3. return them wrapped in a ParsedRepository.
 
     LanguageParser
     ├── PythonParser   (this milestone)
     ├── JavaParser     (later, per ADR-19)
     └── ...
+
+Note: CodeEntity has no `language` or `version` field of its own -
+parsers that want to record that should put it in `entity.metadata`
+(e.g. metadata={"language": "python", "version": version}).
 """
 
 from __future__ import annotations
@@ -22,15 +26,16 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from graphmem.models import ParsedRepository
+from graphmem.models.repository import ParsedRepository
 
 
 class LanguageParser(ABC):
     """Abstract base class for all per-language repository parsers."""
 
-    #: Overridden by subclasses, e.g. "python". Used in CodeEntity.language
-    #: and for file-extension based dispatch by callers that support
-    #: multiple languages at once.
+    #: Overridden by subclasses, e.g. "python". Not a CodeEntity field -
+    #: callers that support multiple languages can use this for
+    #: extension-based dispatch, and parsers should stash it in
+    #: entity.metadata["language"] if they want it on individual nodes.
     language: str = "unknown"
 
     @abstractmethod
@@ -53,7 +58,7 @@ class LanguageParser(ABC):
 
     @staticmethod
     def resolve_version(repository_path: str) -> str:
-        """Best-effort repository version string for entity IDs (ADR-14).
+        """Best-effort repository version string, for entity IDs and metadata (ADR-14).
 
         Uses the current git commit SHA when the path is inside a git
         repository with at least one commit; falls back to "working"
@@ -85,6 +90,11 @@ class LanguageParser(ABC):
         """Build a stable entity ID per the ADR-14 format::
 
             repo://<repo_name>/<relative_path>[::<qualified_name>]@<version>
+
+        This is just a plain string assigned to CodeEntity.id - it
+        doesn't depend on any particular set of dataclass fields
+        existing, so it stays valid even as the rest of the model
+        evolves.
         """
         relative_path = relative_path.replace("\\", "/")
         base = f"repo://{repo_name}/{relative_path}"

@@ -9,7 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from graphmem.models import EntityType, ParsedRepository, RelationType
+from graphmem.models.entities import EntityType
+from graphmem.models.relations import RelationType
+from graphmem.models.repository import ParsedRepository
 from graphmem.parsing import PythonParser
 
 SAMPLE_REPO = Path(__file__).resolve().parents[1] / "examples" / "sample_repo"
@@ -21,16 +23,39 @@ def parsed() -> ParsedRepository:
     return parser.parse_repository(str(SAMPLE_REPO))
 
 
-def find_one(parsed_repo: ParsedRepository, *, type: EntityType, qualified_name: str = None, file_path: str = None):
+# ----------------------------------------------------------------------
+# Small local helpers (kept in the test file, not on the shared model -
+# ParsedRepository only exposes add_entity/add_relation/get_entity).
+# ----------------------------------------------------------------------
+
+
+def entities_by_type(parsed_repo: ParsedRepository, entity_type: EntityType):
+    return [e for e in parsed_repo.entities if e.type == entity_type]
+
+
+def relations_by_type(parsed_repo: ParsedRepository, relation_type: RelationType):
+    return [r for r in parsed_repo.relations if r.type == relation_type]
+
+
+def find_one(parsed_repo: ParsedRepository, *, type: EntityType, qualified_name: str = None, path: str = None):
     matches = [
         e
         for e in parsed_repo.entities
         if e.type == type
         and (qualified_name is None or e.qualified_name == qualified_name)
-        and (file_path is None or e.file_path == file_path)
+        and (path is None or e.path == path)
     ]
     assert len(matches) == 1, f"expected exactly one match, got {len(matches)}: {matches}"
     return matches[0]
+
+
+def children_of(parsed_repo: ParsedRepository, entity_id: str):
+    child_ids = {
+        r.target_id
+        for r in parsed_repo.relations
+        if r.type == RelationType.CONTAINS and r.source_id == entity_id
+    }
+    return [e for e in parsed_repo.entities if e.id in child_ids]
 
 
 # ----------------------------------------------------------------------
@@ -46,11 +71,11 @@ def test_returns_parsed_repository(parsed: ParsedRepository):
 
 
 def test_repository_and_file_entities_exist(parsed: ParsedRepository):
-    repo_entities = parsed.entities_by_type(EntityType.REPOSITORY)
+    repo_entities = entities_by_type(parsed, EntityType.REPOSITORY)
     assert len(repo_entities) == 1
 
-    file_entities = parsed.entities_by_type(EntityType.FILE)
-    file_paths = {e.file_path for e in file_entities}
+    file_entities = entities_by_type(parsed, EntityType.FILE)
+    file_paths = {e.path for e in file_entities}
     assert file_paths == {
         "file.py",
         "broken.py",
@@ -62,7 +87,7 @@ def test_repository_and_file_entities_exist(parsed: ParsedRepository):
 
 
 def test_directory_entities_exist(parsed: ParsedRepository):
-    dir_paths = {e.file_path for e in parsed.entities_by_type(EntityType.DIRECTORY)}
+    dir_paths = {e.path for e in entities_by_type(parsed, EntityType.DIRECTORY)}
     assert dir_paths == {"pkg", "pkg/sub"}
 
 
@@ -81,7 +106,7 @@ def test_directory_entities_exist(parsed: ParsedRepository):
 def test_class_extracted(parsed: ParsedRepository):
     class_a = find_one(parsed, type=EntityType.CLASS, qualified_name="ClassA")
     assert class_a.name == "ClassA"
-    assert class_a.file_path == "file.py"
+    assert class_a.path == "file.py"
     assert class_a.start_line == 15  # class ClassA: line in file.py
 
 
@@ -92,7 +117,7 @@ def test_methods_extracted_as_methods_not_functions(parsed: ParsedRepository):
     assert method2.name == "method2"
 
     # These must NOT show up as top-level FUNCTION entities.
-    function_names = {e.qualified_name for e in parsed.entities_by_type(EntityType.FUNCTION)}
+    function_names = {e.qualified_name for e in entities_by_type(parsed, EntityType.FUNCTION)}
     assert "method1" not in function_names
     assert "method2" not in function_names
 
@@ -100,17 +125,17 @@ def test_methods_extracted_as_methods_not_functions(parsed: ParsedRepository):
 def test_module_level_function_extracted(parsed: ParsedRepository):
     function1 = find_one(parsed, type=EntityType.FUNCTION, qualified_name="function1")
     assert function1.name == "function1"
-    assert function1.file_path == "file.py"
+    assert function1.path == "file.py"
 
 
 def test_contains_hierarchy_file_to_class_to_methods(parsed: ParsedRepository):
-    file_entity = find_one(parsed, type=EntityType.FILE, file_path="file.py")
+    file_entity = find_one(parsed, type=EntityType.FILE, path="file.py")
     class_a = find_one(parsed, type=EntityType.CLASS, qualified_name="ClassA")
     method1 = find_one(parsed, type=EntityType.METHOD, qualified_name="ClassA.method1")
     method2 = find_one(parsed, type=EntityType.METHOD, qualified_name="ClassA.method2")
     function1 = find_one(parsed, type=EntityType.FUNCTION, qualified_name="function1")
 
-    contains = parsed.relations_by_type(RelationType.CONTAINS)
+    contains = relations_by_type(parsed, RelationType.CONTAINS)
     pairs = {(r.source_id, r.target_id) for r in contains}
 
     assert (file_entity.id, class_a.id) in pairs
@@ -125,7 +150,7 @@ def test_contains_hierarchy_file_to_class_to_methods(parsed: ParsedRepository):
 
 def test_children_of_helper_matches_contains_edges(parsed: ParsedRepository):
     class_a = find_one(parsed, type=EntityType.CLASS, qualified_name="ClassA")
-    children = {c.qualified_name for c in parsed.children_of(class_a.id)}
+    children = {c.qualified_name for c in children_of(parsed, class_a.id)}
     assert children == {"ClassA.method1", "ClassA.method2"}
 
 
@@ -135,29 +160,29 @@ def test_children_of_helper_matches_contains_edges(parsed: ParsedRepository):
 
 
 def test_absolute_import_resolved_within_repo(parsed: ParsedRepository):
-    file_entity = find_one(parsed, type=EntityType.FILE, file_path="file.py")
-    helpers_entity = find_one(parsed, type=EntityType.FILE, file_path="pkg/sub/helpers.py")
+    file_entity = find_one(parsed, type=EntityType.FILE, path="file.py")
+    helpers_entity = find_one(parsed, type=EntityType.FILE, path="pkg/sub/helpers.py")
 
-    imports = parsed.relations_by_type(RelationType.IMPORTS)
+    imports = relations_by_type(parsed, RelationType.IMPORTS)
     pairs = {(r.source_id, r.target_id) for r in imports}
     assert (file_entity.id, helpers_entity.id) in pairs
 
 
 def test_relative_import_resolved(parsed: ParsedRepository):
-    helpers_entity = find_one(parsed, type=EntityType.FILE, file_path="pkg/sub/helpers.py")
-    base_entity = find_one(parsed, type=EntityType.FILE, file_path="pkg/sub/base.py")
+    helpers_entity = find_one(parsed, type=EntityType.FILE, path="pkg/sub/helpers.py")
+    base_entity = find_one(parsed, type=EntityType.FILE, path="pkg/sub/base.py")
 
-    imports = parsed.relations_by_type(RelationType.IMPORTS)
+    imports = relations_by_type(parsed, RelationType.IMPORTS)
     pairs = {(r.source_id, r.target_id) for r in imports}
     assert (helpers_entity.id, base_entity.id) in pairs
 
 
 def test_external_import_not_turned_into_an_edge_but_kept_as_metadata(parsed: ParsedRepository):
-    file_entity = find_one(parsed, type=EntityType.FILE, file_path="file.py")
+    file_entity = find_one(parsed, type=EntityType.FILE, path="file.py")
 
     # `import os` must not create an IMPORTS edge to anything (there's no
     # `os` entity in this repo), but the raw statement should be recorded.
-    imports = parsed.relations_by_type(RelationType.IMPORTS)
+    imports = relations_by_type(parsed, RelationType.IMPORTS)
     targets_from_file = {r.target_id for r in imports if r.source_id == file_entity.id}
     os_like_targets = [t for t in targets_from_file if t.endswith("/os@working") or "::os" in t]
     assert os_like_targets == []
@@ -171,7 +196,7 @@ def test_external_import_not_turned_into_an_edge_but_kept_as_metadata(parsed: Pa
 
 
 def test_syntax_error_does_not_crash_and_is_recorded(parsed: ParsedRepository):
-    broken = find_one(parsed, type=EntityType.FILE, file_path="broken.py")
+    broken = find_one(parsed, type=EntityType.FILE, path="broken.py")
     assert "parse_error" in broken.metadata
 
     # And the rest of the repo was still parsed successfully.
@@ -189,3 +214,9 @@ def test_stable_ids_follow_adr14_format(parsed: ParsedRepository):
     # repo://<repo_name>/<relative_path>::<qualified_name>@<version>
     assert class_a.id.startswith("repo://")
     assert "/file.py::ClassA@" in class_a.id
+
+
+def test_get_entity_lookup(parsed: ParsedRepository):
+    file_entity = find_one(parsed, type=EntityType.FILE, path="file.py")
+    assert parsed.get_entity(file_entity.id) is file_entity
+    assert parsed.get_entity("repo://does-not-exist@working") is None
