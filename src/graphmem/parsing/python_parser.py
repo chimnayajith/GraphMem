@@ -114,7 +114,11 @@ class PythonParser(LanguageParser):
 
         # --- Pass 1: discover files, build the directory hierarchy and the
         #     module map used for import resolution -------------------------
-        file_records = self._discover_files(repo_root)
+        file_records = self._discover_files(
+            repo_root,
+            repo_name,
+            version,
+        )
         module_map = {rec.module_name: rec for rec in file_records}
 
         self._build_directory_hierarchy(
@@ -148,11 +152,14 @@ class PythonParser(LanguageParser):
     # Repository discovery
     # ------------------------------------------------------------------
 
-    def _discover_files(self, repo_root: Path) -> list[_FileRecord]:
+    def _discover_files(
+        self,
+        repo_root: Path,
+        repo_name: str,
+        version: str,
+    ) -> list[_FileRecord]:
         records: list[_FileRecord] = []
-        repo_name = self.resolve_repo_name(str(repo_root))
-        version = self.resolve_version(str(repo_root))
-
+ 
         for path in sorted(repo_root.rglob("*.py")):
             if any(part in self.excluded_dirs for part in path.relative_to(repo_root).parts):
                 continue
