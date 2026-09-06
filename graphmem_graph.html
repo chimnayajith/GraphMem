@@ -1,0 +1,127 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 800px;
+                 background-color: #111111;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo@ba513f1", "label": "sample_repo", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e repository\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e sample_repo\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e -\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg@ba513f1", "label": "pkg", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e directory\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e pkg\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub@ba513f1", "label": "sub", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e directory\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e sub\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/broken.py@ba513f1", "label": "broken.py", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e file\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e broken.py\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e broken.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/file.py@ba513f1", "label": "file.py", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e file\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e file.py\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e file.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/__init__.py@ba513f1", "label": "__init__.py", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e file\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e __init__.py\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/__init__.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub/__init__.py@ba513f1", "label": "__init__.py", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e file\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e __init__.py\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub/__init__.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub/base.py@ba513f1", "label": "base.py", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e file\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e base.py\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub/base.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub/helpers.py@ba513f1", "label": "helpers.py", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e file\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e helpers.py\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub/helpers.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e - - -"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/file.py::ClassA@ba513f1", "label": "ClassA", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e class\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e ClassA\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e file.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 15 - 20"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/file.py::ClassA.method1@ba513f1", "label": "method1", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e method\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e method1\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e file.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 16 - 17"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/file.py::ClassA.method2@ba513f1", "label": "method2", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e method\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e method2\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e file.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 19 - 20"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/file.py::function1@ba513f1", "label": "function1", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e function\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e function1\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e file.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 23 - 24"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub/base.py::Base@ba513f1", "label": "Base", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e class\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e Base\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub/base.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 1 - 3"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub/base.py::Base.format@ba513f1", "label": "format", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e method\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e format\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub/base.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 2 - 3"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub/helpers.py::normalize@ba513f1", "label": "normalize", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e function\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e normalize\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub/helpers.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 7 - 8"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub/helpers.py::Formatter@ba513f1", "label": "Formatter", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e class\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e Formatter\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub/helpers.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 11 - 13"}, {"color": "#97c2fc", "font": {"color": "white"}, "id": "repo://sample_repo/pkg/sub/helpers.py::Formatter.format@ba513f1", "label": "format", "shape": "dot", "title": "\u003cb\u003eType:\u003c/b\u003e method\u003cbr\u003e\u003cb\u003eName:\u003c/b\u003e format\u003cbr\u003e\u003cb\u003ePath:\u003c/b\u003e pkg/sub/helpers.py\u003cbr\u003e\u003cb\u003eLines:\u003c/b\u003e 12 - 13"}]);
+                  edges = new vis.DataSet([{"arrows": "to", "from": "repo://sample_repo@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo@ba513f1", "label": "contains", "to": "repo://sample_repo/broken.py@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo@ba513f1", "label": "contains", "to": "repo://sample_repo/file.py@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/__init__.py@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub/__init__.py@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub/base.py@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub/helpers.py@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/file.py@ba513f1", "label": "contains", "to": "repo://sample_repo/file.py::ClassA@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/file.py@ba513f1", "label": "contains", "to": "repo://sample_repo/file.py::function1@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/file.py@ba513f1", "label": "imports", "to": "repo://sample_repo/pkg/sub/helpers.py@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub/base.py@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub/base.py::Base@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub/helpers.py@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub/helpers.py::normalize@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub/helpers.py@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub/helpers.py::Formatter@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub/helpers.py@ba513f1", "label": "imports", "to": "repo://sample_repo/pkg/sub/base.py@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/file.py::ClassA@ba513f1", "label": "contains", "to": "repo://sample_repo/file.py::ClassA.method1@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/file.py::ClassA@ba513f1", "label": "contains", "to": "repo://sample_repo/file.py::ClassA.method2@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub/base.py::Base@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub/base.py::Base.format@ba513f1"}, {"arrows": "to", "from": "repo://sample_repo/pkg/sub/helpers.py::Formatter@ba513f1", "label": "contains", "to": "repo://sample_repo/pkg/sub/helpers.py::Formatter.format@ba513f1"}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {"physics": {"enabled": true, "stabilization": {"iterations": 200}}, "interaction": {"hover": true, "navigationButtons": true, "keyboard": true}, "edges": {"arrows": {"to": {"enabled": true}}, "smooth": true}};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>
