@@ -2,3 +2,5 @@ networkx
 pytest
 rank-bm25
 pyvis
+tree_sitter
+tree_sitter_python

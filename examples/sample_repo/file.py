@@ -21,4 +21,8 @@ class ClassA:
 
 
 def function1():
+    a = 5
+    b = 5
+    c = 5
+    d = b+c
     return ClassA().method1("hi")
